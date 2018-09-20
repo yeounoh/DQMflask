@@ -1,8 +1,6 @@
 # Data Quality Metric (DQM) over Python Flask
 Estimating the number of remaining errors (aka Data Quality Metric/`DQM`) in a dataset is an important problem. Previously (http://www.vldb.org/pvldb/vol10/p1094-chung.pdf), we have shown that some heuristic estimators can provide useful estimates to guide the data cleaning process (e.g., know when to stop cleaning). 
 
-This work implements a simulator for selected estimation techniques.
-
 # Overview
 We simulate a data error detection experiment using crowds. One of the key design goals was to dynamically render the task page on AMT, according to the current estimation status. That is, we pose new questions to the next worker based on the previous responses we've collected. This is different from actual data cleaning nor other estimation scenarios where we pre-define all the random batches to render the task page.
 
@@ -21,6 +19,7 @@ python main.py
 ```
 
 # Running The Client
+The simulator is implemented in `simulation.py`. It has a number of simulation parameters:
 ```python
 python simulation.py -h
 usage: simulation.py [-h] [-assignment NUM_ASSIGNMENTS] [-hits NUM_HITS]
@@ -46,8 +45,13 @@ optional arguments:
                         VOTING
 ```
 
-## Amazon Mechanical Turks Expeirments
-`amt/` folder contains codes for AMT experiments. The experiments (data cleaning or error detection) were crowdsourced on AMT.
+For instance, to simulate an estimation using Triangular Walk algorithm (`est_type 0`) with 10 HITs (also 10 tracks of independent experiments), 50 assignments per HIT, run the following command.
 ```python
-python amt/exp_restaurant_dataset.py
+python simulation -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 0
 ```
+The `n_max` flag sets the depth of the triangle for the algorithm, and `n_rep` the number of simulation repetetions. The result look like this:
+
+![picture alt](https://github.com/yeounoh/DQMflask/edit/master/README.md/5h60a_20m.png "Simulation Result")
+
+
+
