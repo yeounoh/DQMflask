@@ -1,7 +1,7 @@
 # Data Quality Metric (DQM) over Python Flask
 Estimating the number of remaining errors (aka Data Quality Metric/`DQM`) in a dataset is an important problem. Previously (http://www.vldb.org/pvldb/vol10/p1094-chung.pdf), we have shown that some heuristic estimators can provide useful estimates to guide the data cleaning process (e.g., know when to stop cleaning). 
 
-# Overview
+## System Overview
 We simulate a data error detection experiment using crowds. One of the key design goals was to dynamically render the task page on AMT, according to the current estimation status. That is, we pose new questions to the next worker based on the previous responses we've collected. This is different from actual data cleaning nor other estimation scenarios where we pre-define all the random batches to render the task page.
 
 This enables more efficient estimation (in terms of the number of worker responses, a.k.a. assignments); however, such as, this is much slower in wall-clock time. To speed up the estimation process, as well as to reduce the estimation bias, we run multiple independent tracks of experiments, of which we average the results. To further optimize the run-time, we load-balance the incoming worker traffics to the multiple tracks/experiments.
