@@ -8,17 +8,17 @@ This enables more efficient estimation (in terms of the number of worker respons
 
 The simulator runs with a Python Flask server, running locally. This becomes handy when we run real experiments using Amazon Mechanical Turks.
 
-# Setup & Install Dependencies
-* Clone this git repo: `git clone https://github.com/yeounoh/DQMflask.git`.
+## Setup
+* Clone this repository: `git clone https://github.com/yeounoh/DQMflask.git`.
 * Start Python `virtualenv` with Python 2 (https://help.dreamhost.com/hc/en-us/articles/215489338-Installing-and-using-virtualenv-with-Python-2).
 * Run `pip install -r requirements.txt` in the cloned local git repo.
 
-# Running The Server
+## Running The Server
 ```python
 python main.py
 ```
 
-# Running The Client
+## Running The Client
 The simulator is implemented in `simulation.py`. It has a number of simulation parameters:
 ```python
 python simulation.py -h
@@ -47,11 +47,30 @@ optional arguments:
 
 For instance, to simulate an estimation using Triangular Walk algorithm (`est_type 0`) with 10 HITs (also 10 tracks of independent experiments), 50 assignments per HIT, run the following command.
 ```python
-python simulation -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 0
+python simulation.py -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 0
 ```
-The `n_max` flag sets the depth of the triangle for the algorithm, and `n_rep` the number of simulation repetetions. The result look like this:
+The `n_max` flag sets the depth of the triangle for the algorithm, and `n_rep` the number of simulation repetetions. Similarly, we can also run a baseline, majority voting estimation (`est_type 1`).
+```python
+python simulation -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 1
+```
 
-![picture alt](https://github.com/yeounoh/DQMflask/blob/master/5h_60a_20m.png "Simulation Result")
+You can plot the results by running `analyze.py`:
+```python
+python analyze.py -h
+usage: analyze.py [-h] [-n_rep N_REP] [-title TITLE] [-baseline BASELINE]
 
+Plot the experimental results.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -n_rep N_REP, --n_rep N_REP
+                        The number of repeted simulations for an experiment.
+  -title TITLE, --title TITLE
+                        Plot title.
+  -baseline BASELINE, --baseline BASELINE
+                        With baseline (0: None, 1: VOTING)
+```
+
+![picture alt](https://github.com/yeounoh/DQMflask/blob/master/5h_60a_20m_v.png "Simulation Result")
 
 
