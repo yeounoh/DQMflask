@@ -51,7 +51,7 @@ python simulation.py -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_ty
 ```
 The `n_max` flag sets the depth of the triangle for the algorithm, and `n_rep` the number of simulation repetetions. Similarly, we can also run a baseline, majority voting estimation (`est_type 1`).
 ```python
-python simulation -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 1
+python simulation.py -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 1
 ```
 
 You can plot the results by running `analyze.py`:
@@ -69,6 +69,10 @@ optional arguments:
                         Plot title.
   -baseline BASELINE, --baseline BASELINE
                         With baseline (0: None, 1: VOTING)
+```
+
+```python
+python analyze.py -n_rep 5 -baseline 1 -title "5 HITs * 60 Assignments/HIT / n_max=20"
 ```
 
 ![picture alt](https://github.com/yeounoh/DQMflask/blob/master/5h_60a_20m_v.png "Simulation Result")
