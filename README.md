@@ -51,7 +51,7 @@ python simulation -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 
 ```
 The `n_max` flag sets the depth of the triangle for the algorithm, and `n_rep` the number of simulation repetetions. The result look like this:
 
-![picture alt](https://github.com/yeounoh/DQMflask/edit/master/README.md/5h60a_20m.png "Simulation Result")
+![picture alt](https://github.com/yeounoh/DQMflask/blob/master/5h_60a_20m.png "Simulation Result")
 
 
 
