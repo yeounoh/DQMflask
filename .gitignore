@@ -107,4 +107,3 @@ venv.bak/
 logs/*
 results/*
 figs/*
-*.png
