@@ -16,6 +16,10 @@ import io
 import boto3, botocore
 import pickle
 import Queue
+import random, string
+import copy
+import time
+import threading
 
 from util import * 
 
@@ -23,6 +27,8 @@ from rq import Queue as rQueue
 from worker import conn
 
 #Start Configuration Variables
+AWS_ACCESS_KEY_ID = "AKIAJE4YCRH44M4ND7JA"
+AWS_SECRET_ACCESS_KEY = "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"
 DEV_ENVIROMENT_BOOLEAN = False
 DEBUG = True
 #End Configuration Variables
@@ -38,57 +44,69 @@ app = Flask(__name__, static_url_path='')
 filename = 'pqueue.p'
 filename_update = 'new_elements.p'
 bucket_name = 'dqm'
-data, label = load_restaurant_dataset()
+data, label, items_by_label = load_restaurant_dataset()
 
-num_workers = Queue.PriorityQueue()
+# num_workers = Queue.PriorityQueue()
 pqueues = dict()
 rqueue = rQueue(connection=conn)
+pqueues_lock = threading.RLock()
+# num_worker_lock = threading.RLock()
+tracker = 0
 
 @app.route('/init', methods=['GET', 'POST'])
 def init():
     global pqueues
-    global num_workers
+    # global num_workers
     num_tracks_ = int(request.args.get('num_tracks'))
-    for i in range(num_tracks_):
-        pqueues[i] = Queue.PriorityQueue()
-        num_workers.put((0,i))
-
-    return 'Server initializaed', 200, {'Content-Type': 'text/css; charset=utf-8'}
-
-@app.route('/check', methods=['GET', 'POST'])
-def check_queue():
-    global pqueues
-    n_ = request.args.get('n')
-    sidx_ = request.args.get('sidx')
-    k_ = request.args.get('k')
-    issued_id_ = int(request.args.get('issued_id'))
-    track_id_ = int(request.args.get('track_id'))
-    item_ = (-1 * int(n_), int(sidx_), int(k_), int(issued_id_))
     
-    if track_id_ not in pqueues:
-        return 'False', 200, {'Content-Type': 'text/css; charset=utf-8'}
+    with pqueues_lock:
+        for i in range(num_tracks_):
+            pqueues[i] = Queue.PriorityQueue()
+    # with num_worker_lock:
+    #     for i in range(num_tracks_):
+    #         num_workers.put((0,i))
+    if len(pqueues) == num_tracks_:
+        return 'Server initializaed', 200, {'Content-Type': 'text/css; charset=utf-8'}
+    else:
+        return 'Initialization failed', 500, {'Content-Type': 'text/css; charset=utf-8'}
 
-    queue_ = pqueues[track_id_]    
-    is_present = item_[3] in [p_[3] for p_ in queue_.queue]
+
+# @app.route('/check', methods=['GET', 'POST'])
+# def check_queue():
+#     global pqueues
+#     n_ = request.args.get('n')
+#     sidx_ = request.args.get('sidx')
+#     k_ = request.args.get('k')
+#     issued_id_ = int(request.args.get('issued_id'))
+#     track_id_ = int(request.args.get('track_id'))
+#     item_ = (-1 * int(n_), int(sidx_), int(k_), int(issued_id_))
     
-    return '%s'%is_present, 200, {'Content-Type': 'text/css; charset=utf-8'}
+#     if track_id_ not in pqueues:
+#         return 'False', 200, {'Content-Type': 'text/css; charset=utf-8'}
+
+#     queue_ = pqueues[track_id_]    
+#     is_present = item_[3] in [p_[3] for p_ in queue_.queue]
+    
+#     return '%s'%is_present, 200, {'Content-Type': 'text/css; charset=utf-8'}
 
 @app.route('/update', methods=['GET', 'POST'])
 def update_queue():
     global pqueues
-    n_ = request.args.get('n')
-    sidx_ = request.args.get('sidx')
-    k_ = request.args.get('k')
-    issued_id_ = request.args.get('issued_id')
-    track_id_ = int(request.args.get('track_id'))
-    item_ = (-1 * int(n_), int(sidx_), int(k_), int(issued_id_))
-    
-    if track_id_ not in pqueues:
-        pqueues[track_id_] = Queue.PriorityQueue()
-    queue_ = pqueues[track_id_]
-    queue_.put(item_)
+    with pqueues_lock:
+        n_ = request.args.get('n')
+        sidx_ = request.args.get('sidx')
+        k_ = request.args.get('k')
+        issued_id_ = request.args.get('issued_id')
+        track_id_ = int(request.args.get('track_id'))
+        item_ = (-1*int(n_), (int(n_), int(sidx_), int(k_), int(issued_id_)))
+        #item_ = (int(n_), int(sidx_), int(k_), int(issued_id_))
+        
+        if track_id_ in pqueues:
+            pqueues[track_id_].put(item_)
+        else:
+            return 'update failed on %s'%track_id_, 500, {'Content-Type': 'text/css; charset=utf-8'}
+        return 'update_queue( %s, %s, %s, %s ) track %s'%(n_,sidx_,k_, issued_id_, track_id_), 200, {'Content-Type': 'text/css; charset=utf-8'}
 
-    return 'update_queue( %s, %s, %s, %s ) track %s qsize %s'%(n_,sidx_,k_, issued_id_, track_id_, queue_.qsize()), 200, {'Content-Type': 'text/css; charset=utf-8'}
 
 @app.route('/work', methods=['GET', 'POST'])
 def work():
@@ -96,27 +114,49 @@ def work():
     global num_workers
     global data
     global label
+    global items_by_label
     
+    #The following code segment can be used to check if the turker has accepted the task yet
+    if request.args.get("assignmentId") == "ASSIGNMENT_ID_NOT_AVAILABLE":
+        #Our worker hasn't accepted the HIT (task) yet
+        return 'Please accept the HIT from the dashboard.'
+    else:
+        #Our worker accepted the task
+        pass
+
     num_items = 10
-    #track_id_ = int(request.args.get('trackId'))
-    n_w_, track_id_ = -1, -1
-    try:
-        n_w_, track_id_ = num_workers.get()
-        num_workers.put((n_w_+1, track_id_))
-    except Queue.Empty:
-        print 'num_workers empty in work()??'
-        return 'Server temporarily down, please try again in a few minutes', 200, {'Content-Type': 'text/css; charset=utf-8'}
+    track_id_ =  int(request.args.get('trackId'))
     
-    queue_ = pqueues[track_id_]
+    with pqueues_lock:
+        while True:
+            if track_id_ in pqueues:
+                queue_ = pqueues[track_id_]
+                break
+            else:
+                return 'Server temporarily down, please try again in a few minutes', 503, {'Content-Type': 'text/css; charset=utf-8'}
+                
+    #print 'work on', track_id_
+
     batch = list()
-    honeypot = -1
-    for i in range(num_items):
-        try:
-            t = queue_.get(block=False)
-            if label[data[t[1]]] == 1:
-                honeypot = i+1
-        except Queue.Empty:
-            t = None
+    honeypot1_pos = np.random.choice(12) # yes
+    honeypot2_pos = (honeypot1_pos + 4)%12 # no
+    cnt = 0
+    for i in range(num_items+2): # num_items + 2 honeypots
+        if i == honeypot1_pos:
+            pos = np.random.choice(len(items_by_label[1]))
+            t = (0, pos, 0, -2)
+        elif i == honeypot2_pos:
+            pos = np.random.choice(len(items_by_label[0]))
+            t = (0, pos, 0, -3)
+        else:    
+            try:
+                if cnt < 5:
+                    t = queue_.get(block=False)[1]
+                    cnt += 1
+                else:
+                    t = None
+            except Queue.Empty:
+                t = None
         batch.append(t)
 
     render_data = {
@@ -125,16 +165,29 @@ def work():
         "amazon_host": AMAZON_HOST,
         "hit_id": request.args.get("hitId"),
         "track_id": track_id_,
-        "honeypot": "v%s_option1"%honeypot
+        "honeypot1": "v%s_option1"%(honeypot1_pos+1),
+        "honeypot2": "v%s_option2"%(honeypot2_pos+1)
     }
+    
+    # random_items = list()
     for idx in range(len(batch)):
         t = batch[idx]
+        n_, sidx_, k_, issued_id_ = -1, -1, -1, -1
         if t is None:
-            n_, sidx_, k_, issued_id_ = -1, -1, -1, -1
-            item_pair_ = 'Please click *no* to this empty question<br/>-'
+            sidx_ = np.random.choice(len(data))
+            # while sidx_ in random_items:
+            #     sidx_ = np.random.choice(len(data))
+            # random_items.append(sidx_)
+            n_, k_ = 0, 0
+            #item_pair_ = 'Please click *no* to this empty question<br/>-'
         else:
             n_, sidx_, k_, issued_id_ = t[0], t[1], t[2], t[3]
-            n_ = -1 * int(n_)
+
+        if issued_id_ == -2:
+            item_pair_ = items_by_label[1][t[1]]
+        elif issued_id_ == -3:
+            item_pair_ = items_by_label[0][t[1]]
+        else:
             item_pair_ = data[sidx_]
 
         q = (item_pair_, n_, sidx_, k_, issued_id_)
@@ -145,10 +198,8 @@ def work():
         render_data["sidx_%s"%(idx+1)] = q[2]
         render_data["k_%s"%(idx+1)] = q[3]
         render_data["issued_id_%s"%(idx+1)] = q[4]
-    
-    #render_data = rqueue.enqueue(work_helper, render_data, batch, data)
 
-    resp = make_response(render_template("restaurant_tmpl_%s.html"%num_items, name = render_data))
+    resp = make_response(render_template("restaurant_tmpl_%s.html"%len(batch), name = render_data))
     
     resp.headers['x-frame-options'] = 'this_can_be_anything'
     return resp
@@ -156,28 +207,40 @@ def work():
 @app.route('/test', methods=['GET', 'POST'])
 def test():
     global pqueues
-    global num_workers
+    global tracker
 
+    num_tracks = int(request.args.get('num_tracks'))
     num_items = int(request.args.get('num_items'))
-
-    n_w_, track_id_ = -1, -1
-    try:
-        n_w_, track_id_ = num_workers.get()
-        num_workers.put((n_w_+1, track_id_))
-    except Queue.Empty:
-        return 'Server temporarily down, please try again in a few minutes', 200, {'Content-Type': 'text/css; charset=utf-8'}
+    worker_quality = float(request.args.get('worker_quality'))
+    track_id_ = tracker % num_tracks
+    tracker += 1
     
     queue_ = pqueues[track_id_]
+
     batch = list()
-    for i in range(num_items):
-        try:
-            t = queue_.get(block=False)
-        except Queue.Empty:
-            t = None
+    honeypot1_pos = np.random.choice(12) # yes
+    honeypot2_pos = (honeypot1_pos + 4)%12 # no
+    cnt = 0
+    for i in range(num_items+2): # num_items + 2 honeypots
+        if i == honeypot1_pos:
+            pos = np.random.choice(len(items_by_label[1]))
+            t = (0, pos, 0, -2)
+        elif i == honeypot2_pos:
+            pos = np.random.choice(len(items_by_label[0]))
+            t = (0, pos, 0, -3)
+        else:    
+            try:
+                if cnt < 5:
+                    t = queue_.get(block=False)[1]
+                    cnt += 1
+                else:
+                    t = None
+            except Queue.Empty:
+                t = None
         batch.append(t)
 
     items = list()
-    for i in range(num_items):
+    for i in range(len(batch)):
         # ideal response with ground truth
         '''
             var output = {
@@ -191,49 +254,58 @@ def test():
         '''
         
         if batch[i] is None:
-            n_, sidx_, k_, issued_id_ = -1, -1, -1, -1
-            v1_is_valid_ = 'no'
+            n_, sidx_, k_, issued_id_ = 0, np.random.choice(len(data)), 0, -1
         else:
             n_, sidx_, k_, issued_id_ = batch[i]
-            n_ = -1 * int(n_)
-            label_ = label[data[int(sidx_)]]
+        label_ = label[data[int(sidx_)]]
+        if np.random.random() < worker_quality:
             v1_is_valid_ = 'no'
             if label_ == 1:
                 v1_is_valid_ = 'yes'
+        else:
+            v1_is_valid_ = 'yes'
+            if label_ == 1:
+                v1_is_valid_ = 'no'
         
         resp = {"v1_is_valid":v1_is_valid_, "sidx":sidx_, "n":n_, "k":k_, "issued_id":issued_id_, "track_id":track_id_}
         items.append(resp)
+    response = {'items':items}
+    response['AssignmentId'] = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
+    response['WorkerId'] = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(6))
 
-    return json.dumps(items)
+    return json.dumps(response)
 
-@app.route('/reset', methods=['GET', 'POST'])
-def reset():
-    global pqueues
-    track_id_ = int(request.args.get('track_id'))
-    queue_ = pqueues[track_id_]
-    queue_.queue.clear()
-    return 'Reset queue', 200, {'Content-Type': 'text/css; charset=utf-8'}
 
 @app.route('/', methods=['GET', 'POST'])
 def main():
+    # global num_workers
+    global tracker
     num_items = 10 
+    num_tracks = 5
     
     #The following code segment can be used to check if the turker has accepted the task yet
     if request.args.get("assignmentId") == "ASSIGNMENT_ID_NOT_AVAILABLE":
         #Our worker hasn't accepted the HIT (task) yet
-        pass
+        render_data = {
+            "worker_id": request.args.get("workerId"),
+            "assignment_id": request.args.get("assignmentId"),
+            "amazon_host": AMAZON_HOST,
+            "heroku_app": "https://dqm-01.herokuapp.com/work",
+            "hit_id": request.args.get("hitId"),
+            "track_id": -1
+        }
     else:
         #Our worker accepted the task
-        pass
-
-    render_data = {
-        "worker_id": request.args.get("workerId"),
-        "assignment_id": request.args.get("assignmentId"),
-        "amazon_host": AMAZON_HOST,
-        "heroku_app": "https://dqm-01.herokuapp.com/work",
-        "hit_id": request.args.get("hitId"),
-        "track_id": -1
-    }
+        track_id_ = tracker % num_tracks
+        tracker += 1
+        render_data = {
+            "worker_id": request.args.get("workerId"),
+            "assignment_id": request.args.get("assignmentId"),
+            "amazon_host": AMAZON_HOST,
+            "heroku_app": "https://dqm-01.herokuapp.com/work",
+            "hit_id": request.args.get("hitId"),
+            "track_id": track_id_
+        }
 
     resp = make_response(render_template("preview.html", name = render_data))
 
