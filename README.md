@@ -23,7 +23,7 @@ The simulator is implemented in `simulation.py`. It has a number of simulation p
 ```python
 python simulation.py -h
 usage: simulation.py [-h] [-assignment NUM_ASSIGNMENTS] [-hits NUM_HITS]
-                     [-n_max N_MAX] [-qsize QUEUE_SIZE] [-n_rep N_REP]
+                     [-n_max N_MAX] [-n_rep N_REP] [-w WORKER_QUALITY]
                      [-est_type ESTIMATOR_TYPE]
 
 Simulated Triangular Walk Experiment.
@@ -36,28 +36,29 @@ optional arguments:
                         Number of HITs
   -n_max N_MAX, --n_max N_MAX
                         Triangle depth
-  -qsize QUEUE_SIZE, --queue_size QUEUE_SIZE
-                        Server-side priority queue size
   -n_rep N_REP, --n_rep N_REP
                         Simulation repetetions
+  -w WORKER_QUALITY, --worker_quality WORKER_QUALITY
+                        Worker quality (default=1.0)
   -est_type ESTIMATOR_TYPE, --estimator_type ESTIMATOR_TYPE
                         Estimation technique (default=0) 0: TriangularWalk, 1:
-                        VOTING
+                        VOTING, 2: SWITCH
 ```
 
-For instance, to simulate an estimation using Triangular Walk algorithm (`est_type 0`) with 10 HITs (also 10 tracks of independent experiments), 50 assignments per HIT, run the following command.
+For instance, to simulate an estimation using Triangular Walk algorithm (`est_type 0`) with 10 HITs (also 10 tracks of independent experiments), 60 assignments per HIT, run the following command.
 ```python
-python simulation.py -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 0
+python simulation.py -assignment 60 -hits 5 -n_max 20 -n_rep 5 -est_type 0
 ```
 The `n_max` flag sets the depth of the triangle for the algorithm, and `n_rep` the number of simulation repetetions. Similarly, we can also run a baseline, majority voting estimation (`est_type 1`).
 ```python
-python simulation.py -assignment 60 -hits 5 -n_max 20 -qsize 20 -n_rep 5 -est_type 1
+python simulation.py -assignment 60 -hits 5 -n_max 20 -n_rep 5 -est_type 1
 ```
 
 You can plot the results by running `analyze.py`:
 ```python
 python analyze.py -h
 usage: analyze.py [-h] [-n_rep N_REP] [-title TITLE] [-baseline BASELINE]
+                  [-x X_MAX]
 
 Plot the experimental results.
 
@@ -68,7 +69,10 @@ optional arguments:
   -title TITLE, --title TITLE
                         Plot title.
   -baseline BASELINE, --baseline BASELINE
-                        With baseline (0: None, 1: VOTING)
+                        With baseline (0: None, 1: VOTING, 2: VOTING & SWITCH)
+  -x X_MAX, --x_max X_MAX
+                        the maximum x (number of assignment) range for
+                        plotting (deafult 1000)
 ```
 
 ```python
